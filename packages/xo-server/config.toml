@@ -76,6 +76,10 @@ secureOptions = 117440512
 [http.mounts]
 '/' = '../xo-web/dist'
 
+# List of proxied URLs (HTTP & WebSockets).
+[http.proxies]
+'/supportPanel' = 'https://beta.support.vates.fr'
+
 [remoteOptions]
 mountsDir = '/run/xo-server/mounts'
 

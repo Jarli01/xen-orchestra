@@ -19,6 +19,8 @@ import {
   subscribeBackupNgLogs,
 } from 'xo'
 
+const OPEN_SOURCE_USER = +process.env.XOA_PLAN === 5
+
 export default decorate([
   addSubscriptions(({ id }) => ({
     log: cb =>
@@ -66,6 +68,21 @@ export default decorate([
       formattedLog: (_, { log }) => JSON.stringify(log, null, 2),
       jobFailed: (_, { log = {} }) =>
         log.status !== 'success' && log.status !== 'pending',
+      files: ({ formattedLog }, { log }) =>
+        !OPEN_SOURCE_USER
+          ? [
+              {
+                file: new window.Blob([formattedLog], {
+                  type: 'application/json',
+                }),
+                name: `${new Date(log.start)
+                  .toISOString()
+                  .replace(/:/g, '_')} - backup NG.log`,
+              },
+            ]
+          : undefined,
+      message: ({ formattedLog }) =>
+        OPEN_SOURCE_USER ? `\`\`\`json\n${formattedLog}\n\`\`\`` : undefined,
     },
   }),
   injectState,
@@ -91,7 +108,8 @@ export default decorate([
         </Tooltip>
         {CAN_REPORT_BUG && (
           <ReportBugButton
-            message={`\`\`\`json\n${state.formattedLog}\n\`\`\``}
+            files={state.files}
+            message={state.message}
             size='small'
             title='Backup job failed'
           />
