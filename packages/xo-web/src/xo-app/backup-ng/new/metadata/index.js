@@ -9,11 +9,12 @@ import React from 'react'
 import Upgrade from 'xoa-upgrade'
 import { Card, CardBlock, CardHeader } from 'card'
 import { Container, Col, Row } from 'grid'
+import { every, isEmpty, mapValues, map } from 'lodash'
 import { generateId, linkState } from 'reaclette-utils'
 import { injectState, provideState } from 'reaclette'
-import { every, isEmpty, mapValues, map } from 'lodash'
 import { Remote } from 'render-xo-item'
-import { SelectPool, SelectRemote } from 'select-objects'
+import { resolveId } from 'utils'
+import { SelectPool, SelectProxy, SelectRemote } from 'select-objects'
 import {
   createMetadataBackupJob,
   createSchedule,
@@ -71,17 +72,6 @@ const setSettingsDefaultRetentions = (
       : setting
   )
 
-const getInitialState = () => ({
-  _modePoolMetadata: undefined,
-  _modeXoMetadata: undefined,
-  _name: undefined,
-  _pools: undefined,
-  _remotes: undefined,
-  _schedules: undefined,
-  _settings: undefined,
-  showErrors: false,
-})
-
 export default decorate([
   New => props => (
     <Upgrade place='newMetadataBackup' required={3}>
@@ -92,7 +82,17 @@ export default decorate([
     remotes: subscribeRemotes,
   }),
   provideState({
-    initialState: getInitialState,
+    initialState: () => ({
+      _modePoolMetadata: undefined,
+      _modeXoMetadata: undefined,
+      _name: undefined,
+      _pools: undefined,
+      _proxyId: undefined,
+      _remotes: undefined,
+      _schedules: undefined,
+      _settings: undefined,
+      showErrors: false,
+    }),
     effects: {
       createJob: () => async state => {
         if (state.isJobInvalid) {
@@ -104,6 +104,7 @@ export default decorate([
           modeXoMetadata,
           name,
           pools,
+          proxyId,
           remotes,
           schedules,
           settings,
@@ -111,6 +112,7 @@ export default decorate([
         await createMetadataBackupJob({
           name,
           pools: modePoolMetadata ? constructPattern(pools) : undefined,
+          proxy: proxyId === null ? undefined : proxyId,
           remotes: constructPattern(remotes),
           schedules: mapValues(schedules, ({ id, ...schedule }) => schedule),
           settings: setSettingsDefaultRetentions(settings, {
@@ -155,11 +157,19 @@ export default decorate([
           }),
         ])
 
-        const { modePoolMetadata, modeXoMetadata, name, pools, remotes } = state
+        const {
+          modePoolMetadata,
+          modeXoMetadata,
+          name,
+          pools,
+          proxyId,
+          remotes,
+        } = state
         await editMetadataBackupJob({
           id: props.job.id,
           name,
           pools: modePoolMetadata ? constructPattern(pools) : null,
+          proxy: proxyId,
           remotes: constructPattern(remotes),
           settings: setSettingsDefaultRetentions(settings, {
             modePoolMetadata,
@@ -170,13 +180,15 @@ export default decorate([
       },
 
       linkState,
-      reset: () => getInitialState,
       setPools: (_, _pools) => () => ({
         _pools,
       }),
       setSchedules: (_, _schedules) => () => ({
         _schedules,
       }),
+      setProxy(_, proxy) {
+        this.state._proxyId = resolveId(proxy)
+      },
       setSettings: (_, _settings) => () => ({
         _settings,
       }),
@@ -210,6 +222,7 @@ export default decorate([
     },
     computed: {
       idForm: generateId,
+      inputProxyId: generateId,
 
       modePoolMetadata: ({ _modePoolMetadata }, { job }) =>
         defined(_modePoolMetadata, () => !isEmpty(destructPattern(job.pools))),
@@ -218,6 +231,7 @@ export default decorate([
       name: (state, { job }) => defined(state._name, () => job.name, ''),
       pools: ({ _pools }, { job }) =>
         defined(_pools, () => destructPattern(job.pools)),
+      proxyId: ({ _proxyId }, { job }) => defined(_proxyId, () => job.proxy),
       retentions: ({ modePoolMetadata, modeXoMetadata }) => {
         const retentions = []
         if (modePoolMetadata) {
@@ -247,7 +261,9 @@ export default decorate([
         ),
       remotes: ({ _remotes }, { job }) =>
         defined(_remotes, () => destructPattern(job.remotes), []),
-      remotesPredicate: ({ remotes }) => ({ id }) => !remotes.includes(id),
+      remotesPredicate: ({ proxyId, remotes }) => remote =>
+        remotes.indexOf(remote.id) === -1 &&
+        (proxyId == null || remote.value.proxy === proxyId),
 
       isJobInvalid: state =>
         state.missingModes ||
@@ -276,7 +292,7 @@ export default decorate([
     },
   }),
   injectState,
-  ({ state, effects, job, remotes }) => {
+  ({ state, effects, job, remotes, resetState }) => {
     const [submitHandler, submitTitle] =
       job === undefined
         ? [effects.createJob, 'formCreate']
@@ -390,6 +406,16 @@ export default decorate([
               <Card>
                 <CardHeader>{_('newBackupSettings')}</CardHeader>
                 <CardBlock>
+                  <FormGroup>
+                    <label htmlFor={state.inputProxyId}>
+                      <strong>{_('proxy')}</strong>
+                    </label>
+                    <SelectProxy
+                      id={state.inputProxyId}
+                      onChange={effects.setProxy}
+                      value={state.proxyId}
+                    />
+                  </FormGroup>
                   <ReportWhen
                     onChange={effects.setReportWhen}
                     required
@@ -444,9 +470,9 @@ export default decorate([
                     {_(submitTitle)}
                   </ActionButton>
                   <ActionButton
-                    handler={effects.reset}
-                    icon='undo'
                     className='pull-right'
+                    handler={resetState}
+                    icon='undo'
                     size='large'
                   >
                     {_('formReset')}
