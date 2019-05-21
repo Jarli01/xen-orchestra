@@ -22,7 +22,7 @@ import { injectState, provideState } from 'reaclette'
 import { Map } from 'immutable'
 import { Number } from 'form'
 import { renderXoItemFromId, Remote } from 'render-xo-item'
-import { SelectRemote, SelectSr, SelectVm } from 'select-objects'
+import { SelectProxy, SelectRemote, SelectSr, SelectVm } from 'select-objects'
 import {
   addSubscriptions,
   connectStore,
@@ -122,6 +122,7 @@ const createDoesRetentionExist = name => {
 
 const getInitialState = () => ({
   _displayAdvancedSettings: undefined,
+  _proxyId: undefined,
   _vmsPattern: undefined,
   backupMode: false,
   compression: undefined,
@@ -183,9 +184,10 @@ export default decorate([
         }
 
         await createBackupNgJob({
-          name: state.name,
-          mode: state.isDelta ? 'delta' : 'full',
           compression: state.compression,
+          mode: state.isDelta ? 'delta' : 'full',
+          name: state.name,
+          proxy: state.proxyId === null ? undefined : state.proxyId,
           schedules: mapValues(
             state.schedules,
             ({ id, ...schedule }) => schedule
@@ -264,10 +266,11 @@ export default decorate([
         )
 
         await editBackupNgJob({
-          id: props.job.id,
-          name: state.name,
-          mode: state.isDelta ? 'delta' : 'full',
           compression: state.compression,
+          id: props.job.id,
+          mode: state.isDelta ? 'delta' : 'full',
+          name: state.name,
+          proxy: state.proxyId,
           settings: normalizeSettings({
             settings: settings || state.propSettings,
             exportMode: state.exportMode,
@@ -473,6 +476,9 @@ export default decorate([
         return getInitialState()
       },
       setCompression: (_, compression) => ({ compression }),
+      setProxy(_, proxy) {
+        this.state._proxyId = resolveId(proxy)
+      },
       toggleDisplayAdvancedSettings: () => ({ displayAdvancedSettings }) => ({
         _displayAdvancedSettings: !displayAdvancedSettings,
       }),
@@ -524,6 +530,7 @@ export default decorate([
       formId: generateId,
       inputConcurrencyId: generateId,
       inputFullIntervalId: generateId,
+      inputProxyId: generateId,
       inputTimeoutId: generateId,
 
       vmsPattern: ({ _vmsPattern }, { job }) =>
@@ -580,7 +587,9 @@ export default decorate([
             get(() => hostsById[poolsById[$container].master].version)
         ),
       srPredicate: ({ srs }) => sr => isSrWritable(sr) && !includes(srs, sr.id),
-      remotePredicate: ({ remotes }) => ({ id }) => !includes(remotes, id),
+      remotePredicate: ({ proxyId, remotes }) => remote =>
+        remotes.indexOf(remote.id) === -1 &&
+        (proxyId == null || remote.value.proxy === proxyId),
       propSettings: (_, { job }) =>
         Map(get(() => job.settings)).map(setting =>
           defined(
@@ -604,6 +613,7 @@ export default decorate([
               }
             : setting
         ),
+      proxyId: ({ _proxyId }, { job }) => defined(_proxyId, () => job.proxy),
       displayAdvancedSettings: (state, props) =>
         defined(
           state._displayAdvancedSettings,
@@ -866,6 +876,16 @@ export default decorate([
                   </ActionButton>
                 </CardHeader>
                 <CardBlock>
+                  <FormGroup>
+                    <label htmlFor={state.inputProxyId}>
+                      <strong>{_('proxy')}</strong>
+                    </label>
+                    <SelectProxy
+                      id={state.inputProxyId}
+                      onChange={effects.setProxy}
+                      value={state.proxyId}
+                    />
+                  </FormGroup>
                   <ReportWhen
                     onChange={effects.setReportWhen}
                     required
