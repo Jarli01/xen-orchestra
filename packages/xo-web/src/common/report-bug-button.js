@@ -29,7 +29,7 @@ const reportOnGithub = ({ formatMessage, message, title }) => {
   )
 }
 
-const SUPPORT_PANEL_URL = `./supportPanel/create/ticket`
+const SUPPORT_PANEL_URL = `./support/create/ticket`
 const reportOnSupportPanel = async ({
   files = [],
   formatMessage = identity,
