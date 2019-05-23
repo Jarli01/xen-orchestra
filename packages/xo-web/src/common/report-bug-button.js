@@ -3,6 +3,8 @@ import decorate from 'apply-decorators'
 import defined from '@xen-orchestra/defined'
 import PropTypes from 'prop-types'
 import React from 'react'
+import xoaUpdater from 'xoa-updater'
+import { createBinaryFile, getXoaPlan } from 'utils'
 import { identity, omit } from 'lodash'
 import { injectState, provideState } from 'reaclette'
 import { post } from 'fetch'
@@ -12,7 +14,7 @@ import ActionRowButton from './action-row-button'
 
 export const CAN_REPORT_BUG = process.env.XOA_PLAN > 1
 
-export const reportBug = ({ formatMessage, message, title }) => {
+const reportOnGithub = ({ formatMessage, message, title }) => {
   const encodedTitle = encodeURIComponent(title == null ? '' : title)
   const encodedMessage = encodeURIComponent(
     message == null
@@ -23,16 +25,13 @@ export const reportBug = ({ formatMessage, message, title }) => {
   )
 
   window.open(
-    process.env.XOA_PLAN < 5
-      ? `https://xen-orchestra.com/#!/member/support?title=${encodedTitle}&message=${encodedMessage}`
-      : `https://github.com/vatesfr/xen-orchestra/issues/new?title=${encodedTitle}&body=${encodedMessage}`
+    `https://github.com/vatesfr/xen-orchestra/issues/new?title=${encodedTitle}&body=${encodedMessage}`
   )
 }
 
-const SUPPORT_PANEL_URL = `${window.location.origin}/supportPanel/create/ticket`
-
-const reportBugWithFiles = ({
-  files,
+const SUPPORT_PANEL_URL = `./supportPanel/create/ticket`
+const reportOnSupportPanel = async ({
+  files = [],
   formatMessage = identity,
   message,
   title,
@@ -40,13 +39,23 @@ const reportBugWithFiles = ({
   const { FormData, open } = window
 
   const formData = new FormData()
-  formData.append('title', title)
+  if (title !== undefined) {
+    formData.append('title', title)
+  }
   if (message !== undefined) {
     formData.append('message', formatMessage(message))
   }
-  files.forEach(({ file, name }) => {
-    formData.append('attachments', file, name)
+  files.forEach(({ content, name }) => {
+    formData.append('attachments', content, name)
   })
+
+  formData.append(
+    'attachments',
+    createBinaryFile(
+      JSON.stringify(await xoaUpdater.getLocalManifest(), null, 2)
+    ),
+    'manifest.json'
+  )
 
   return post(SUPPORT_PANEL_URL, formData).then(async res => {
     const status = defined(res.status, res.statusCode)
@@ -57,10 +66,13 @@ const reportBugWithFiles = ({
   })
 }
 
+export const reportBug =
+  getXoaPlan() === 'Community' ? reportOnGithub : reportOnSupportPanel
+
 const REPORT_BUG_BUTTON_PROP_TYPES = {
   files: PropTypes.arrayOf(
     PropTypes.shape({
-      file: PropTypes.oneOfType([
+      content: PropTypes.oneOfType([
         PropTypes.instanceOf(window.Blob),
         PropTypes.instanceOf(window.File),
       ]).isRequired,
@@ -70,17 +82,14 @@ const REPORT_BUG_BUTTON_PROP_TYPES = {
   formatMessage: PropTypes.func,
   message: PropTypes.string,
   rowButton: PropTypes.bool,
-  title: PropTypes.string.isRequired,
+  title: PropTypes.string,
 }
 
 const ReportBugButton = decorate([
   provideState({
     effects: {
       async reportBug() {
-        const { props } = this
-        props.files !== undefined
-          ? await reportBugWithFiles(props)
-          : reportBug(props)
+        await reportBug(this.props)
       },
     },
     computed: {

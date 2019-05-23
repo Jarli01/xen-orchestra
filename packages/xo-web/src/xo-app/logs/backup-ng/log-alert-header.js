@@ -9,8 +9,8 @@ import Icon from 'icon'
 import React from 'react'
 import ReportBugButton, { CAN_REPORT_BUG } from 'report-bug-button'
 import Tooltip from 'tooltip'
-import { downloadLog } from 'utils'
-import { get } from '@xen-orchestra/defined'
+import { createBinaryFile, downloadLog, formatDate, getXoaPlan } from 'utils'
+import { get, ifDef } from '@xen-orchestra/defined'
 import { injectState, provideState } from 'reaclette'
 import { keyBy } from 'lodash'
 import {
@@ -18,8 +18,6 @@ import {
   subscribeBackupNgJobs,
   subscribeBackupNgLogs,
 } from 'xo'
-
-const OPEN_SOURCE_USER = +process.env.XOA_PLAN === 5
 
 export default decorate([
   addSubscriptions(({ id }) => ({
@@ -68,21 +66,23 @@ export default decorate([
       formattedLog: (_, { log }) => JSON.stringify(log, null, 2),
       jobFailed: (_, { log = {} }) =>
         log.status !== 'success' && log.status !== 'pending',
-      files: ({ formattedLog }, { log }) =>
-        !OPEN_SOURCE_USER
-          ? [
-              {
-                file: new window.Blob([formattedLog], {
-                  type: 'application/json',
-                }),
-                name: `${new Date(log.start)
-                  .toISOString()
-                  .replace(/:/g, '_')} - backup NG.log`,
-              },
-            ]
-          : undefined,
-      message: ({ formattedLog }) =>
-        OPEN_SOURCE_USER ? `\`\`\`json\n${formattedLog}\n\`\`\`` : undefined,
+      reportBugProps: ({ formattedLog }, { log = {} }) => {
+        const props = {
+          size: 'small',
+          title: 'Backup job failed',
+        }
+        if (getXoaPlan() === 'Community') {
+          props.message = `\`\`\`json\n${formattedLog}\n\`\`\``
+        } else {
+          props.files = [
+            {
+              content: createBinaryFile(formattedLog),
+              name: `${ifDef(log.start, formatDate)} - backup NG.log`,
+            },
+          ]
+        }
+        return props
+      },
     },
   }),
   injectState,
@@ -106,14 +106,7 @@ export default decorate([
             <Icon icon='download' />
           </Button>
         </Tooltip>
-        {CAN_REPORT_BUG && (
-          <ReportBugButton
-            files={state.files}
-            message={state.message}
-            size='small'
-            title='Backup job failed'
-          />
-        )}
+        {CAN_REPORT_BUG && <ReportBugButton {...state.reportBugProps} />}
         {state.jobFailed && log.scheduleId !== undefined && (
           <ActionButton
             handler={effects.restartFailedVms}
