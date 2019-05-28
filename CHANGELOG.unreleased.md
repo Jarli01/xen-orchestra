@@ -3,6 +3,7 @@
 ### Enhancements
 
 - [VM/Advanced] Ability to use UEFI instead of BIOS [#4264](https://github.com/vatesfr/xen-orchestra/issues/4264) (PR [#4268](https://github.com/vatesfr/xen-orchestra/pull/4268))
+- [SR/Create] Add API to discover ZFS pools on current host (PR [#4258](https://github.com/vatesfr/xen-orchestra/pull/4258))
 
 ### Bug fixes
 
