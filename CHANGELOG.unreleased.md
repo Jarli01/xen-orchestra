@@ -3,7 +3,7 @@
 ### Enhancements
 
 - [VM/Advanced] Ability to use UEFI instead of BIOS [#4264](https://github.com/vatesfr/xen-orchestra/issues/4264) (PR [#4268](https://github.com/vatesfr/xen-orchestra/pull/4268))
-- [Logs] Ability to report a bug with joined log (PR [#4201](https://github.com/vatesfr/xen-orchestra/pull/4201))
+- [Logs] Ability to report a bug with attached log (PR [#4201](https://github.com/vatesfr/xen-orchestra/pull/4201))
 
 ### Bug fixes
 

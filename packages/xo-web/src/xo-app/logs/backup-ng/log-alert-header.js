@@ -4,12 +4,13 @@ import addSubscriptions from 'add-subscriptions'
 import Button from 'button'
 import ButtonGroup from 'button-group'
 import CopyToClipboard from 'react-copy-to-clipboard'
+import currentPlan, { XOA_PLAN_SOURCES } from 'plans'
 import decorate from 'apply-decorators'
 import Icon from 'icon'
 import React from 'react'
 import ReportBugButton, { CAN_REPORT_BUG } from 'report-bug-button'
 import Tooltip from 'tooltip'
-import { createBinaryFile, downloadLog, formatDate, getXoaPlan } from 'utils'
+import { createBinaryFile, downloadLog, formatDate } from 'utils'
 import { get, ifDef } from '@xen-orchestra/defined'
 import { injectState, provideState } from 'reaclette'
 import { keyBy } from 'lodash'
@@ -71,13 +72,13 @@ export default decorate([
           size: 'small',
           title: 'Backup job failed',
         }
-        if (getXoaPlan() === 'Community') {
+        if (currentPlan === XOA_PLAN_SOURCES) {
           props.message = `\`\`\`json\n${formattedLog}\n\`\`\``
         } else {
           props.files = [
             {
               content: createBinaryFile(formattedLog),
-              name: `${ifDef(log.start, formatDate)} - backup NG.log`,
+              name: `${ifDef(log.start, formatDate)} - backup.log`,
             },
           ]
         }

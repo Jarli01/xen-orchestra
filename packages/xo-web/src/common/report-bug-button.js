@@ -1,10 +1,10 @@
 import _ from 'intl'
+import currentPlan, { XOA_PLAN_FREE, XOA_PLAN_SOURCES } from 'plans'
 import decorate from 'apply-decorators'
-import defined from '@xen-orchestra/defined'
 import PropTypes from 'prop-types'
 import React from 'react'
 import xoaUpdater from 'xoa-updater'
-import { createBinaryFile, getXoaPlan } from 'utils'
+import { createBinaryFile } from 'utils'
 import { identity, omit } from 'lodash'
 import { injectState, provideState } from 'reaclette'
 import { post } from 'fetch'
@@ -12,7 +12,8 @@ import { post } from 'fetch'
 import ActionButton from './action-button'
 import ActionRowButton from './action-row-button'
 
-export const CAN_REPORT_BUG = process.env.XOA_PLAN > 1
+export const CAN_REPORT_BUG = currentPlan > XOA_PLAN_FREE
+const SUPPORT_PANEL_URL = './api/support/create/ticket'
 
 const reportOnGithub = ({ formatMessage, message, title }) => {
   const encodedTitle = encodeURIComponent(title == null ? '' : title)
@@ -29,7 +30,6 @@ const reportOnGithub = ({ formatMessage, message, title }) => {
   )
 }
 
-const SUPPORT_PANEL_URL = `./api/support/create/ticket`
 const reportOnSupportPanel = async ({
   files = [],
   formatMessage = identity,
@@ -57,17 +57,15 @@ const reportOnSupportPanel = async ({
     'manifest.json'
   )
 
-  return post(SUPPORT_PANEL_URL, formData).then(async res => {
-    const status = defined(res.status, res.statusCode)
-    if (status !== 200) {
-      throw new Error('cannot get the new ticket URL')
-    }
-    return open(await res.text())
-  })
+  const res = await post(SUPPORT_PANEL_URL, formData)
+  if (res.status !== 200) {
+    throw new Error('cannot get the new ticket URL')
+  }
+  open(await res.text())
 }
 
 export const reportBug =
-  getXoaPlan() === 'Community' ? reportOnGithub : reportOnSupportPanel
+  currentPlan === XOA_PLAN_SOURCES ? reportOnGithub : reportOnSupportPanel
 
 const REPORT_BUG_BUTTON_PROP_TYPES = {
   files: PropTypes.arrayOf(
@@ -89,7 +87,13 @@ const ReportBugButton = decorate([
   provideState({
     effects: {
       async reportBug() {
-        await reportBug(this.props)
+        const { files, formatMessage, message, title } = this.props
+        await reportBug({
+          files,
+          formatMessage,
+          message,
+          title,
+        })
       },
     },
     computed: {
