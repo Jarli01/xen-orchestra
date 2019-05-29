@@ -1873,6 +1873,7 @@ const messages = {
   logUser: 'User',
   logMessage: 'Message',
   logSuggestXcpNg: 'Use XCP-ng to get rid of restrictions',
+  logXapiError: 'This is a XenServer/XCP-ng error',
   logError: 'Error',
   logTitle: 'Logs',
   logDisplayDetails: 'Display details',
