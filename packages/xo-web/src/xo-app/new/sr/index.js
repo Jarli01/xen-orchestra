@@ -40,6 +40,7 @@ import {
   probeSrNfsExists,
   probeSrHba,
   probeSrHbaExists,
+  probeZfs,
   reattachSrIso,
   reattachSr,
 } from 'xo'
@@ -200,6 +201,7 @@ const SR_TYPE_TO_LABEL = {
   nfs: 'NFS',
   nfsiso: 'NFS ISO',
   smb: 'SMB',
+  zfs: 'ZFS',
 }
 
 const SR_GROUP_TO_LABEL = {
@@ -208,7 +210,7 @@ const SR_GROUP_TO_LABEL = {
 }
 
 const typeGroups = {
-  vdisr: ['ext', 'hba', 'iscsi', 'lvm', 'nfs'],
+  vdisr: ['ext', 'hba', 'iscsi', 'lvm', 'nfs', 'zfs'],
   isosr: ['local', 'nfsiso', 'smb'],
 }
 
@@ -378,7 +380,7 @@ export default class New extends Component {
       hbaDevices: undefined,
       iqns: undefined,
       paths: undefined,
-      summary: includes(['ext', 'lvm', 'local', 'smb', 'hba'], type),
+      summary: includes(['ext', 'lvm', 'local', 'smb', 'hba', 'zfs'], type),
       type,
       unused: undefined,
       usage: undefined,
@@ -389,6 +391,14 @@ export default class New extends Component {
       const hbaDevices = await probeSrHba(this.state.host.id)::ignoreErrors()
       this.setState(({ loading }) => ({
         hbaDevices,
+        loading: loading - 1,
+      }))
+    }
+    if (type === 'zfs' && this.state.host !== undefined) {
+      this.setState(({ loading }) => ({ loading: loading + 1 }))
+      const zfsPools = await probeZfs(this.state.host.id)::ignoreErrors()
+      this.setState(({ loading }) => ({
+        zfsPools,
         loading: loading - 1,
       }))
     }
@@ -857,6 +867,13 @@ export default class New extends Component {
                         required
                         type='text'
                       />
+                    </fieldset>
+                  )}
+                  {type === 'zfs' && (
+                    <fieldset>
+                      <label htmlFor='srPath'>Available pools</label>{' '}
+                      {/*put this on messages.js*/}
+                      {/* Display available pools fetched from sr.probeZfs */}
                     </fieldset>
                   )}
                 </fieldset>
