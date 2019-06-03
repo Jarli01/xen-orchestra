@@ -33,6 +33,7 @@ import {
   createSrLvm,
   createSrNfs,
   createSrHba,
+  createSrZfs,
   probeSrIscsiExists,
   probeSrIscsiIqns,
   probeSrIscsiLuns,
@@ -247,6 +248,7 @@ export default class New extends Component {
       unused: undefined,
       usage: undefined,
       used: undefined,
+      zfsPools: undefined,
     }
     this.getHostSrs = createFilter(
       () => this.props.srs,
@@ -268,8 +270,9 @@ export default class New extends Component {
       port,
       server,
       username,
+      zfsLocation,
     } = this.refs
-    const { host, iqn, lun, path, type, scsiId, nfs4, nfsOptions } = this.state
+    const { host, iqn, lun, nfs4, nfsOptions, path, scsiId, type } = this.state
 
     const createMethodFactories = {
       nfs: () =>
@@ -332,6 +335,9 @@ export default class New extends Component {
         createSrLvm(host.id, name.value, description.value, device.value),
       ext: () =>
         createSrExt(host.id, name.value, description.value, device.value),
+      zfs: () => {
+        createSrZfs(host.id, name.value, description.value, zfsLocation.value)
+      },
       local: () =>
         createSrIso(
           host.id,
@@ -394,12 +400,12 @@ export default class New extends Component {
         loading: loading - 1,
       }))
     }
-    if (type === 'zfs' && this.state.host !== undefined) {
-      this.setState(({ loading }) => ({ loading: loading + 1 }))
+    if (type === 'zfs') {
+      await this.setState(({ loading }) => ({ loading: loading + 1 }))
       const zfsPools = await probeZfs(this.state.host.id)::ignoreErrors()
-      this.setState(({ loading }) => ({
-        zfsPools,
+      await this.setState(({ loading }) => ({
         loading: loading - 1,
+        zfsPools,
       }))
     }
   }
@@ -583,6 +589,7 @@ export default class New extends Component {
       unused,
       usage,
       used,
+      zfsPools,
     } = this.state
     const { formatMessage } = this.props.intl
 
@@ -871,9 +878,25 @@ export default class New extends Component {
                   )}
                   {type === 'zfs' && (
                     <fieldset>
-                      <label htmlFor='srPath'>Available pools</label>{' '}
-                      {/*put this on messages.js*/}
-                      {/* Display available pools fetched from sr.probeZfs */}
+                      <label htmlFor='selectSrLocation'>
+                        {_('srLocation')}
+                      </label>
+                      <select
+                        className='form-control'
+                        defaultValue=''
+                        id='selectSrLocation'
+                        ref='zfsLocation'
+                        required
+                      >
+                        <option value=''>
+                          {formatMessage(messages.noSelectedValue)}
+                        </option>
+                        {map(zfsPools, (pool, poolName) => (
+                          <option key={poolName} value={pool.mountpoint}>
+                            {poolName} - {pool.mountpoint}
+                          </option>
+                        ))}
+                      </select>
                     </fieldset>
                   )}
                 </fieldset>
