@@ -400,7 +400,7 @@ export default class New extends Component {
         loading: loading - 1,
       }))
     }
-    if (type === 'zfs') {
+    if (type === 'zfs' && this.state.host !== undefined) {
       await this.setState(({ loading }) => ({ loading: loading + 1 }))
       const zfsPools = await probeZfs(this.state.host.id)::ignoreErrors()
       await this.setState(({ loading }) => ({
