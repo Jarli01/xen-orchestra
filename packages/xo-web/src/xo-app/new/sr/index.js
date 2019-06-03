@@ -194,7 +194,7 @@ class SelectLun extends Component {
 // ===================================================================
 
 const SR_TYPE_TO_LABEL = {
-  ext: 'Local Ext',
+  ext: 'ext (local)',
   hba: 'HBA',
   iscsi: 'iSCSI',
   local: 'Local',
