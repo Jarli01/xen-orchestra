@@ -66,3 +66,23 @@ update.params = {
     optional: true,
   },
 }
+
+// this function is only used for tests
+// it should be removed before merging the branch "proxy-v1"
+export function call({ id, method, params }) {
+  return this.callProxyMethod(id, method, params)
+}
+
+call.permission = 'admin'
+call.params = {
+  id: {
+    type: 'string',
+  },
+  method: {
+    type: 'string',
+  },
+  params: {
+    type: 'object',
+    optional: true,
+  },
+}
