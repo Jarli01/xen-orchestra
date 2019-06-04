@@ -335,9 +335,8 @@ export default class New extends Component {
         createSrLvm(host.id, name.value, description.value, device.value),
       ext: () =>
         createSrExt(host.id, name.value, description.value, device.value),
-      zfs: () => {
-        createSrZfs(host.id, name.value, description.value, zfsLocation.value)
-      },
+      zfs: () =>
+        createSrZfs(host.id, name.value, description.value, zfsLocation.value),
       local: () =>
         createSrIso(
           host.id,
@@ -537,8 +536,11 @@ export default class New extends Component {
         this.setState({ zfsPools })
       },
     }
-
-    if (host !== undefined && host !== null && type !== undefined) {
+    if (
+      probeMethodFactories[type] !== undefined &&
+      host !== undefined &&
+      host !== null
+    ) {
       this.setState(({ loading }) => ({ loading: loading + 1 }))
       await probeMethodFactories[type](host.id)
       this.setState(({ loading }) => ({
