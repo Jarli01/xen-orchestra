@@ -573,6 +573,7 @@ const messages = {
   newSrLocalPathPlaceHolder: '/path/to/directory',
   newSrUseNfs4: 'Use NFSv4',
   newSrNfsOptions: 'Comma delimited NFS options',
+  noZfsSharedAvailable: 'No ZFS shared available',
   reattachNewSrTooltip: 'Reattach SR',
   srLocation: 'Storage location',
 
