@@ -3,6 +3,7 @@
 ### Enhancements
 
 - [VM/Advanced] Ability to use UEFI instead of BIOS [#4264](https://github.com/vatesfr/xen-orchestra/issues/4264) (PR [#4268](https://github.com/vatesfr/xen-orchestra/pull/4268))
+- [VM/Backup] Create backup bulk action [#2573](https://github.com/vatesfr/xen-orchestra/issues/2573) (PR [#4257](https://github.com/vatesfr/xen-orchestra/pull/4257))
 
 ### Bug fixes
 
