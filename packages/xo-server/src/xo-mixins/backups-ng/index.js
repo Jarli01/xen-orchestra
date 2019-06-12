@@ -286,7 +286,7 @@ const importers: $Dict<
       xapi.importVm(xva, { srId: sr.$id })
     )
     await Promise.all([
-      xapi.addTag(vm.$id, 'restored from backup'),
+      vm.add_tags('restored from backup'),
       xapi.editVm(vm.$id, {
         name_label: `${metadata.vm.name_label} (${safeDateFormat(
           metadata.timestamp
@@ -449,10 +449,8 @@ const disableVmHighAvailability = async (xapi: Xapi, vm: Vm) => {
   }
 
   return Promise.all([
-    xapi._setObjectProperties(vm, {
-      haRestartPriority: '',
-    }),
-    xapi.addTag(vm.$ref, 'HA disabled'),
+    vm.set_ha_restart_priority(''),
+    vm.add_tags('HA disabled'),
   ])
 }
 
@@ -509,9 +507,17 @@ const disableVmHighAvailability = async (xapi: Xapi, vm: Vm) => {
 // │  │  ├─ task.start(message: 'transfer')
 // │  │  │  ├─ task.warning(message: string)
 // │  │  │  └─ task.end(result: { size: number })
+// │  │  │
+// │  │  │  // in case of full backup, DR and CR
+// │  │  ├─ task.start(message: 'clean')
+// │  │  │  ├─ task.warning(message: string)
+// │  │  │  └─ task.end
+// │  │  │
+// │  │  │ // in case of delta backup
 // │  │  ├─ task.start(message: 'merge')
 // │  │  │  ├─ task.warning(message: string)
 // │  │  │  └─ task.end(result: { size: number })
+// │  │  │
 // │  │  └─ task.end
 // │  └─ task.end
 // └─ job.end
@@ -937,7 +943,7 @@ export default class BackupNg {
           message: 'clean backup metadata on VM',
           parentId: taskId,
         },
-        xapi._updateObjectMapProperty(vm, 'other_config', {
+        vm.update_other_config({
           'xo:backup:datetime': null,
           'xo:backup:deltaChainLength': null,
           'xo:backup:exported': null,
@@ -1051,7 +1057,7 @@ export default class BackupNg {
         message: 'add metadata to snapshot',
         parentId: taskId,
       },
-      xapi._updateObjectMapProperty(snapshot, 'other_config', {
+      snapshot.update_other_config({
         'xo:backup:datetime': snapshot.snapshot_time,
         'xo:backup:job': jobId,
         'xo:backup:schedule': scheduleId,
@@ -1193,11 +1199,20 @@ export default class BackupNg {
                   )
                 ): any)
 
+                const deleteOldBackups = () =>
+                  wrapTask(
+                    {
+                      logger,
+                      message: 'clean',
+                      parentId: taskId,
+                    },
+                    this._deleteFullVmBackups(handler, oldBackups)
+                  )
                 const deleteFirst = getSetting(settings, 'deleteFirst', [
                   remoteId,
                 ])
                 if (deleteFirst) {
-                  await this._deleteFullVmBackups(handler, oldBackups)
+                  await deleteOldBackups()
                 }
 
                 await wrapTask(
@@ -1213,7 +1228,7 @@ export default class BackupNg {
                 await handler.outputFile(metadataFilename, jsonMetadata)
 
                 if (!deleteFirst) {
-                  await this._deleteFullVmBackups(handler, oldBackups)
+                  await deleteOldBackups()
                 }
               }
             )
@@ -1244,9 +1259,18 @@ export default class BackupNg {
                   listReplicatedVms(xapi, scheduleId, srId, vmUuid)
                 )
 
+                const deleteOldBackups = () =>
+                  wrapTask(
+                    {
+                      logger,
+                      message: 'clean',
+                      parentId: taskId,
+                    },
+                    this._deleteVms(xapi, oldVms)
+                  )
                 const deleteFirst = getSetting(settings, 'deleteFirst', [srId])
                 if (deleteFirst) {
-                  await this._deleteVms(xapi, oldVms)
+                  await deleteOldBackups()
                 }
 
                 const vm = await xapi.barrier(
@@ -1258,29 +1282,27 @@ export default class BackupNg {
                       result: () => ({ size: xva.size }),
                     },
                     xapi._importVm($cancelToken, fork, sr, vm =>
-                      xapi._setObjectProperties(vm, {
-                        nameLabel: `${metadata.vm.name_label} - ${
+                      vm.set_name_label(
+                        `${metadata.vm.name_label} - ${
                           job.name
-                        } - (${safeDateFormat(metadata.timestamp)})`,
-                      })
+                        } - (${safeDateFormat(metadata.timestamp)})`
+                      )
                     )
                   )
                 )
 
                 await Promise.all([
-                  xapi.addTag(vm.$ref, 'Disaster Recovery'),
+                  vm.add_tags('Disaster Recovery'),
                   disableVmHighAvailability(xapi, vm),
-                  xapi._updateObjectMapProperty(vm, 'blocked_operations', {
-                    start:
-                      'Start operation for this vm is blocked, clone it if you want to use it.',
-                  }),
-                  xapi._updateObjectMapProperty(vm, 'other_config', {
-                    'xo:backup:sr': srId,
-                  }),
+                  vm.update_blocked_operations(
+                    'start',
+                    'Start operation for this vm is blocked, clone it if you want to use it.'
+                  ),
+                  vm.update_other_config('xo:backup:sr', srId),
                 ])
 
                 if (!deleteFirst) {
-                  await this._deleteVms(xapi, oldVms)
+                  await deleteOldBackups()
                 }
               }
             )
@@ -1606,9 +1628,19 @@ export default class BackupNg {
                   listReplicatedVms(xapi, scheduleId, srId, vmUuid)
                 )
 
+                const deleteOldBackups = () =>
+                  wrapTask(
+                    {
+                      logger,
+                      message: 'clean',
+                      parentId: taskId,
+                    },
+                    this._deleteVms(xapi, oldVms)
+                  )
+
                 const deleteFirst = getSetting(settings, 'deleteFirst', [srId])
                 if (deleteFirst) {
-                  await this._deleteVms(xapi, oldVms)
+                  await deleteOldBackups()
                 }
 
                 const { vm } = await wrapTask(
@@ -1628,19 +1660,17 @@ export default class BackupNg {
                 )
 
                 await Promise.all([
-                  xapi.addTag(vm.$ref, 'Continuous Replication'),
+                  vm.add_tags('Continuous Replication'),
                   disableVmHighAvailability(xapi, vm),
-                  xapi._updateObjectMapProperty(vm, 'blocked_operations', {
-                    start:
-                      'Start operation for this vm is blocked, clone it if you want to use it.',
-                  }),
-                  xapi._updateObjectMapProperty(vm, 'other_config', {
-                    'xo:backup:sr': srId,
-                  }),
+                  vm.update_blocked_operations(
+                    'start',
+                    'Start operation for this vm is blocked, clone it if you want to use it.'
+                  ),
+                  vm.update_other_config('xo:backup:sr', srId),
                 ])
 
                 if (!deleteFirst) {
-                  await this._deleteVms(xapi, oldVms)
+                  await deleteOldBackups()
                 }
               }
             )
@@ -1667,9 +1697,7 @@ export default class BackupNg {
         message: 'set snapshot.other_config[xo:backup:exported]',
         parentId: taskId,
       },
-      xapi._updateObjectMapProperty(snapshot, 'other_config', {
-        'xo:backup:exported': 'true',
-      })
+      snapshot.update_other_config('xo:backup:exported', 'true')
     )
   }
 

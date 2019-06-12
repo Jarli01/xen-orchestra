@@ -376,7 +376,7 @@ export const dismissNotification = id => {
 export const subscribeNotifications = createSubscription(async () => {
   const { user, xoaUpdaterState } = store.getState()
   if (
-    process.env.XOA_PLAN === 5 ||
+    +process.env.XOA_PLAN === 5 ||
     xoaUpdaterState === 'disconnected' ||
     xoaUpdaterState === 'error'
   ) {
@@ -2535,14 +2535,25 @@ export const editUser = (user, { email, password, permission }) =>
     subscribeUsers.forceRefresh
   )
 
+const _signOutFromEverywhereElse = () =>
+  _call('token.deleteAll', { except: cookies.get('token') })
+
+export const signOutFromEverywhereElse = () =>
+  _signOutFromEverywhereElse().then(
+    () => success(_('forgetTokens'), _('forgetTokensSuccess')),
+    () => error(_('forgetTokens'), _('forgetTokensError'))
+  )
+
 export const changePassword = (oldPassword, newPassword) =>
   _call('user.changePassword', {
     oldPassword,
     newPassword,
-  }).then(
-    () => success(_('pwdChangeSuccess'), _('pwdChangeSuccessBody')),
-    () => error(_('pwdChangeError'), _('pwdChangeErrorBody'))
-  )
+  })
+    .then(_signOutFromEverywhereElse)
+    .then(
+      () => success(_('pwdChangeSuccess'), _('pwdChangeSuccessBody')),
+      () => error(_('pwdChangeError'), _('pwdChangeErrorBody'))
+    )
 
 const _setUserPreferences = preferences =>
   _call('user.set', {

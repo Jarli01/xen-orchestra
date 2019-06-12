@@ -94,7 +94,7 @@ export default {
 
     // Creates the VDIs and executes the initial steps of the
     // installation.
-    await this.call('VM.provision', vmRef)
+    await this.callAsync('VM.provision', vmRef)
 
     let vm = await this._getOrWaitObject(vmRef)
 
@@ -107,17 +107,12 @@ export default {
 
       if (isHvm) {
         if (!isEmpty(vdis) || installMethod === 'network') {
-          const { HVM_boot_params: bootParams } = vm
-          let order = bootParams.order
-          if (order) {
-            order = 'n' + order.replace('n', '')
-          } else {
-            order = 'ncd'
-          }
+          const { order } = vm.HVM_boot_params
 
-          this._setObjectProperties(vm, {
-            HVM_boot_params: { ...bootParams, order },
-          })
+          vm.update_HVM_boot_params(
+            'order',
+            order ? 'n' + order.replace('n', '') : 'ncd'
+          )
         }
       } else {
         // PV
@@ -125,13 +120,12 @@ export default {
           if (installMethod === 'network') {
             // TODO: normalize RHEL URL?
 
-            await this._updateObjectMapProperty(vm, 'other_config', {
-              'install-repository': installRepository,
-            })
+            await vm.update_other_config(
+              'install-repository',
+              installRepository
+            )
           } else if (installMethod === 'cd') {
-            await this._updateObjectMapProperty(vm, 'other_config', {
-              'install-repository': 'cdrom',
-            })
+            await vm.update_other_config('install-repository', 'cdrom')
           }
         }
       }
@@ -264,25 +258,15 @@ export default {
   _editVm: makeEditObject({
     affinityHost: {
       get: 'affinity',
-      set(value, vm) {
-        return this._setObjectProperty(
-          vm,
-          'affinity',
-          value ? this.getObject(value).$ref : NULL_REF
-        )
-      },
+      set: (value, vm) =>
+        vm.set_affinity(value ? this.getObject(value).$ref : NULL_REF),
     },
 
     autoPoweron: {
       set(value, vm) {
         return Promise.all([
-          this._updateObjectMapProperty(vm, 'other_config', {
-            autoPoweron: value ? 'true' : null,
-          }),
-          value &&
-            this.setPoolProperties({
-              autoPoweron: true,
-            }),
+          vm.update_other_config('auto_poweron', value ? 'true' : null),
+          value && vm.$pool.update_other_config('auto_poweron', 'true'),
         ])
       },
     },
@@ -292,23 +276,19 @@ export default {
         if (virtualizationMode !== 'pv' && virtualizationMode !== 'hvm') {
           throw new Error(`The virtualization mode must be 'pv' or 'hvm'`)
         }
-        return this._set('domain_type', virtualizationMode)::pCatch(
-          { code: 'MESSAGE_METHOD_UNKNOWN' },
-          () =>
-            this._set(
-              'HVM_boot_policy',
+        return vm
+          .set_domain_type(virtualizationMode)
+          ::pCatch({ code: 'MESSAGE_METHOD_UNKNOWN' }, () =>
+            vm.set_HVM_boot_policy(
               virtualizationMode === 'hvm' ? 'Boot order' : ''
             )
-        )
+          )
       },
     },
 
     coresPerSocket: {
-      set(coresPerSocket, vm) {
-        return this._updateObjectMapProperty(vm, 'platform', {
-          'cores-per-socket': coresPerSocket,
-        })
-      },
+      set: (coresPerSocket, vm) =>
+        vm.update_platform('cores-per-socket', String(coresPerSocket)),
     },
 
     CPUs: 'cpus',
@@ -326,26 +306,22 @@ export default {
       get: vm => +vm.VCPUs_at_startup,
       set: [
         'VCPUs_at_startup',
-        function(value, vm) {
-          return isVmRunning(vm) && this._set('VCPUs_number_live', value)
-        },
+        (value, vm) => isVmRunning(vm) && vm.set_VCPUs_number_live(value),
       ],
     },
 
     cpuCap: {
       get: vm => vm.VCPUs_params.cap && +vm.VCPUs_params.cap,
-      set(cap, vm) {
-        return this._updateObjectMapProperty(vm, 'VCPUs_params', { cap })
-      },
+      set: (cap, vm) => vm.update_VCPUs_params('cap', String(cap)),
     },
 
     cpuMask: {
       get: vm => vm.VCPUs_params.mask && vm.VCPUs_params.mask.split(','),
-      set(cpuMask, vm) {
-        return this._updateObjectMapProperty(vm, 'VCPUs_params', {
-          mask: cpuMask == null ? cpuMask : cpuMask.join(','),
-        })
-      },
+      set: (cpuMask, vm) =>
+        vm.update_VCPUs_params(
+          'mask',
+          cpuMask == null ? cpuMask : cpuMask.join(',')
+        ),
     },
 
     cpusMax: 'cpusStaticMax',
@@ -359,15 +335,15 @@ export default {
 
     cpuWeight: {
       get: vm => vm.VCPUs_params.weight && +vm.VCPUs_params.weight,
-      set(weight, vm) {
-        return this._updateObjectMapProperty(vm, 'VCPUs_params', { weight })
-      },
+      set: (weight, vm) =>
+        vm.update_VCPUs_params(
+          'weight',
+          weight === null ? null : String(weight)
+        ),
     },
 
     highAvailability: {
-      set(ha, vm) {
-        return this.call('VM.set_ha_restart_priority', vm.$ref, ha)
-      },
+      set: (ha, vm) => vm.set_ha_restart_priority(ha),
     },
 
     memoryMin: {
@@ -439,19 +415,12 @@ export default {
     hasVendorDevice: true,
 
     expNestedHvm: {
-      set(expNestedHvm, vm) {
-        return this._updateObjectMapProperty(vm, 'platform', {
-          'exp-nested-hvm': expNestedHvm ? 'true' : null,
-        })
-      },
+      set: (expNestedHvm, vm) =>
+        vm.update_platform('exp-nested-hvm', expNestedHvm ? 'true' : null),
     },
 
     nicType: {
-      set(nicType, vm) {
-        return this._updateObjectMapProperty(vm, 'platform', {
-          nic_type: nicType,
-        })
-      },
+      set: (nicType, vm) => vm.update_platform('nic_type', nicType),
     },
 
     vga: {
@@ -461,7 +430,7 @@ export default {
             `The different values that the VGA can take are: ${XEN_VGA_VALUES}`
           )
         }
-        return this._updateObjectMapProperty(vm, 'platform', { vga })
+        return vm.update_platform('vga', vga)
       },
     },
 
@@ -472,15 +441,17 @@ export default {
             `The different values that the video RAM can take are: ${XEN_VIDEORAM_VALUES}`
           )
         }
-        return this._updateObjectMapProperty(vm, 'platform', { videoram })
+        return vm.update_platform('videoram', String(videoram))
       },
     },
 
     startDelay: {
       get: vm => +vm.start_delay,
-      set(startDelay, vm) {
-        return this.call('VM.set_start_delay', vm.$ref, startDelay)
-      },
+      set: (startDelay, vm) => vm.set_start_delay(startDelay),
+    },
+
+    hvmBootFirmware: {
+      set: (firmware, vm) => vm.update_HVM_boot_params('firmware', firmware),
     },
   }),
 
@@ -493,7 +464,7 @@ export default {
     if (snapshotBefore) {
       await this._snapshotVm(snapshot.$snapshot_of)
     }
-    await this.call('VM.revert', snapshot.$ref)
+    await this.callAsync('VM.revert', snapshot.$ref)
     if (snapshot.snapshot_info['power-state-at-snapshot'] === 'Running') {
       const vm = await this.barrier(snapshot.snapshot_of)
       if (vm.power_state === 'Halted') {
@@ -506,15 +477,22 @@ export default {
 
   async resumeVm(vmId) {
     // the force parameter is always true
-    return this.call('VM.resume', this.getObject(vmId).$ref, false, true)
+    await this.callAsync('VM.resume', this.getObject(vmId).$ref, false, true)
   },
 
   async unpauseVm(vmId) {
-    return this.call('VM.unpause', this.getObject(vmId).$ref)
+    await this.callAsync('VM.unpause', this.getObject(vmId).$ref)
+  },
+
+  rebootVm(vmId, { hard = false } = {}) {
+    return this.callAsync(
+      `VM.${hard ? 'hard' : 'clean'}_reboot`,
+      this.getObject(vmId).$ref
+    ).then(noop)
   },
 
   shutdownVm(vmId, { hard = false } = {}) {
-    return this.call(
+    return this.callAsync(
       `VM.${hard ? 'hard' : 'clean'}_shutdown`,
       this.getObject(vmId).$ref
     ).then(noop)

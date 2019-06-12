@@ -1,7 +1,7 @@
 {
   "private": true,
   "name": "xo-web",
-  "version": "5.40.1",
+  "version": "5.42.1",
   "license": "AGPL-3.0",
   "description": "Web interface client for Xen-Orchestra",
   "keywords": [
@@ -85,7 +85,7 @@
     "immutable": "^4.0.0-rc.9",
     "index-modules": "^0.3.0",
     "is-ip": "^2.0.0",
-    "jsonrpc-websocket-client": "^0.4.1",
+    "jsonrpc-websocket-client": "^0.5.0",
     "kindof": "^2.0.0",
     "lodash": "^4.6.1",
     "loose-envify": "^1.1.0",

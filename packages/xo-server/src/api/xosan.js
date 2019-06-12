@@ -269,10 +269,10 @@ export async function fixHostNotInNetwork({ xosanSr, host }) {
   if (pif) {
     const newIP = _findIPAddressOutsideList(usedAddresses, HOST_FIRST_NUMBER)
     reconfigurePifIP(xapi, pif, newIP)
-    await xapi.call('PIF.plug', pif.$ref)
+    await xapi.callAsync('PIF.plug', pif.$ref)
     const PBD = find(xosanSr.$PBDs, pbd => pbd.$host.$id === host)
     if (PBD) {
-      await xapi.call('PBD.plug', PBD.$ref)
+      await xapi.callAsync('PBD.plug', PBD.$ref)
     }
     const sshKey = await getOrCreateSshKey(xapi)
     await callPlugin(xapi, host, 'receive_ssh_keys', {
@@ -809,7 +809,7 @@ export const createSR = defer(async function(
     })
     CURRENT_POOL_OPERATIONS[poolId] = { ...OPERATION_OBJECT, state: 6 }
     log.debug('scanning new SR')
-    await xapi.call('SR.scan', xosanSrRef)
+    await xapi.callAsync('SR.scan', xosanSrRef)
     await this.rebindLicense({
       licenseId: license.id,
       oldBoundObjectId: tmpBoundObjectId,
@@ -884,13 +884,13 @@ async function createVDIOnLVMWithoutSizeLimit(xapi, lvmSr, diskSize) {
   if (result.exit !== 0) {
     throw Error('Could not create volume ->' + result.stdout)
   }
-  await xapi.call('SR.scan', xapi.getObject(lvmSr).$ref)
+  await xapi.callAsync('SR.scan', xapi.getObject(lvmSr).$ref)
   const vdi = find(xapi.getObject(lvmSr).$VDIs, vdi => vdi.uuid === uuid)
   if (vdi != null) {
-    await xapi.setSrProperties(vdi.$ref, {
-      nameLabel: 'xosan_data',
-      nameDescription: 'Created by XO',
-    })
+    await Promise.all([
+      vdi.set_name_description('Created by XO'),
+      vdi.set_name_label('xosan_data'),
+    ])
     return vdi
   }
 }
@@ -989,7 +989,7 @@ async function replaceBrickOnSameVM(
     await xapi.disconnectVbd(previousVBD)
     await xapi.deleteVdi(previousVBD.VDI)
     CURRENT_POOL_OPERATIONS[poolId] = { ...OPERATION_OBJECT, state: 4 }
-    await xapi.call('SR.scan', xapi.getObject(xosansr).$ref)
+    await xapi.callAsync('SR.scan', xapi.getObject(xosansr).$ref)
   } finally {
     delete CURRENT_POOL_OPERATIONS[poolId]
   }
@@ -1068,7 +1068,7 @@ export async function replaceBrick({
       await xapi.deleteVm(previousVMEntry.vm, true)
     }
     CURRENT_POOL_OPERATIONS[poolId] = { ...OPERATION_OBJECT, state: 3 }
-    await xapi.call('SR.scan', xapi.getObject(xosansr).$ref)
+    await xapi.callAsync('SR.scan', xapi.getObject(xosansr).$ref)
   } finally {
     delete CURRENT_POOL_OPERATIONS[poolId]
   }
@@ -1115,7 +1115,7 @@ async function _prepareGlusterVm(
   const firstVif = newVM.$VIFs[0]
   if (xosanNetwork.$id !== firstVif.$network.$id) {
     try {
-      await xapi.call('VIF.move', firstVif.$ref, xosanNetwork.$ref)
+      await xapi.callAsync('VIF.move', firstVif.$ref, xosanNetwork.$ref)
     } catch (error) {
       if (error.code === 'MESSAGE_METHOD_UNKNOWN') {
         // VIF.move has been introduced in xenserver 7.0
@@ -1124,7 +1124,7 @@ async function _prepareGlusterVm(
       }
     }
   }
-  await xapi.addTag(newVM.$id, 'XOSAN')
+  await newVM.add_tags('XOSAN')
   await xapi.editVm(newVM, {
     name_label: `XOSAN - ${lvmSr.name_label} - ${
       host.name_label
@@ -1132,7 +1132,7 @@ async function _prepareGlusterVm(
     name_description: 'Xosan VM storage',
     memory: memorySize,
   })
-  await xapi.call('VM.set_xenstore_data', newVM.$ref, xenstoreData)
+  await newVM.set_xenstore_data(xenstoreData)
   const rootDisk = newVM.$VBDs
     .map(vbd => vbd && vbd.$VDI)
     .find(vdi => vdi && vdi.name_label === 'xosan_root')
@@ -1330,7 +1330,7 @@ export const addBricks = defer(async function(
     data.nodes = data.nodes.concat(newNodes)
     await xapi.xo.setData(xosansr, 'xosan_config', data)
     CURRENT_POOL_OPERATIONS[poolId] = { ...OPERATION_OBJECT, state: 2 }
-    await xapi.call('SR.scan', xapi.getObject(xosansr).$ref)
+    await xapi.callAsync('SR.scan', xapi.getObject(xosansr).$ref)
   } finally {
     delete CURRENT_POOL_OPERATIONS[poolId]
   }
@@ -1382,7 +1382,7 @@ export const removeBricks = defer(async function($defer, { xosansr, bricks }) {
     )
     remove(data.nodes, node => ips.includes(node.vm.ip))
     await xapi.xo.setData(xosansr.id, 'xosan_config', data)
-    await xapi.call('SR.scan', xapi.getObject(xosansr._xapiId).$ref)
+    await xapi.callAsync('SR.scan', xapi.getObject(xosansr._xapiId).$ref)
     await asyncMap(brickVMs, vm => xapi.deleteVm(vm.vm, true))
   } finally {
     delete CURRENT_POOL_OPERATIONS[xapi.pool.$id]
@@ -1542,9 +1542,10 @@ export async function downloadAndInstallXosanPack({ id, version, pool }) {
   const res = await this.requestResource('xosan', id, version)
 
   await xapi.installSupplementalPackOnAllHosts(res)
-  await xapi._updateObjectMapProperty(xapi.pool, 'other_config', {
-    xosan_pack_installation_time: String(Math.floor(Date.now() / 1e3)),
-  })
+  await xapi.pool.update_other_config(
+    'xosan_pack_installation_time',
+    String(Math.floor(Date.now() / 1e3))
+  )
 }
 
 downloadAndInstallXosanPack.description = 'Register a resource via cloud plugin'

@@ -35,7 +35,7 @@ export default {
   },
 
   _plugPbd(pbd) {
-    return this.call('PBD.plug', pbd.$ref)
+    return this.callAsync('PBD.plug', pbd.$ref)
   },
 
   async plugPbd(id) {
@@ -43,7 +43,7 @@ export default {
   },
 
   _unplugPbd(pbd) {
-    return this.call('PBD.unplug', pbd.$ref)
+    return this.callAsync('PBD.unplug', pbd.$ref)
   },
 
   async unplugPbd(id) {
@@ -83,5 +83,33 @@ export default {
       }
     })
     return unhealthyVdis
+  },
+
+  async createSr({
+    hostRef,
+
+    content_type = 'user', // recommended by Citrix
+    device_config = {},
+    name_description = '',
+    name_label,
+    shared = false,
+    physical_size = 0,
+    sm_config = {},
+    type,
+  }) {
+    const srRef = await this.call(
+      'SR.create',
+      hostRef,
+      device_config,
+      physical_size,
+      name_label,
+      name_description,
+      type,
+      content_type,
+      shared,
+      sm_config
+    )
+
+    return (await this.barrier(srRef)).uuid
   },
 }

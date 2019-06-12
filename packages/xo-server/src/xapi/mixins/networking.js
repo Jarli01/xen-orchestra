@@ -4,13 +4,13 @@ import { makeEditObject } from '../utils'
 
 export default {
   async _connectVif(vif) {
-    await this.call('VIF.plug', vif.$ref)
+    await this.callAsync('VIF.plug', vif.$ref)
   },
   async connectVif(vifId) {
     await this._connectVif(this.getObject(vifId))
   },
   async _deleteVif(vif) {
-    await this.call('VIF.destroy', vif.$ref)
+    await this.callAsync('VIF.destroy', vif.$ref)
   },
   async deleteVif(vifId) {
     const vif = this.getObject(vifId)
@@ -20,7 +20,7 @@ export default {
     await this._deleteVif(vif)
   },
   async _disconnectVif(vif) {
-    await this.call('VIF.unplug_force', vif.$ref)
+    await this.callAsync('VIF.unplug_force', vif.$ref)
   },
   async disconnectVif(vifId) {
     await this._disconnectVif(this.getObject(vifId))
@@ -37,7 +37,7 @@ export default {
               : 'locked'
 
           if (lockingMode !== vif.locking_mode) {
-            return this._set('locking_mode', lockingMode)
+            return vif.set_locking_mode(lockingMode)
           }
         },
       ],
@@ -53,10 +53,36 @@ export default {
               : 'locked'
 
           if (lockingMode !== vif.locking_mode) {
-            return this._set('locking_mode', lockingMode)
+            return vif.set_locking_mode(lockingMode)
           }
         },
       ],
+    },
+
+    // in kB/s
+    rateLimit: {
+      get: vif => {
+        if (vif.qos_algorithm_type === 'ratelimit') {
+          const { kbps } = vif.qos_algorithm_params
+          if (kbps !== undefined) {
+            return +kbps
+          }
+        }
+
+        // null is value used to remove the existing value
+        //
+        // we need to match this, to allow avoiding the `set` if the value is
+        // already missing.
+        return null
+      },
+      set: (value, vif) =>
+        Promise.all([
+          vif.set_qos_algorithm_type(value === null ? '' : 'ratelimit'),
+          vif.update_qos_algorithm_params(
+            'kbps',
+            value === null ? null : String(value)
+          ),
+        ]),
     },
   }),
 }

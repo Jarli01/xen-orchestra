@@ -320,6 +320,8 @@ create.params = {
       },
     },
   },
+
+  hvmBootFirmware: { type: 'string', optional: true },
 }
 
 create.resolve = {
@@ -603,7 +605,7 @@ set.params = {
   // Switch from Cirrus video adaptor to VGA adaptor
   vga: { type: 'string', optional: true },
 
-  videoram: { type: ['string', 'number'], optional: true },
+  videoram: { type: 'number', optional: true },
 
   coresPerSocket: { type: ['string', 'number', 'null'], optional: true },
 
@@ -621,6 +623,9 @@ set.params = {
 
   // set the VM network interface controller
   nicType: { type: ['string', 'null'], optional: true },
+
+  // set the VM boot firmware mode
+  hvmBootFirmware: { type: ['string', 'null'], optional: true },
 }
 
 set.resolve = {
@@ -630,13 +635,7 @@ set.resolve = {
 // -------------------------------------------------------------------
 
 export async function restart({ vm, force = false }) {
-  const xapi = this.getXapi(vm)
-
-  if (force) {
-    await xapi.call('VM.hard_reboot', vm._xapiRef)
-  } else {
-    await xapi.call('VM.clean_reboot', vm._xapiRef)
-  }
+  return this.getXapi(vm).rebootVm(vm._xapiId, { hard: force })
 }
 
 restart.params = {
@@ -737,7 +736,7 @@ export async function convertToTemplate({ vm }) {
   // Convert to a template requires pool admin permission.
   await this.checkPermissions(this.user.id, [[vm.$pool, 'administrate']])
 
-  await this.getXapi(vm).call('VM.set_is_a_template', vm._xapiRef, true)
+  await this.getXapiObject(vm).set_is_a_template(true)
 }
 
 convertToTemplate.params = {
@@ -1089,7 +1088,7 @@ stop.resolve = {
 // -------------------------------------------------------------------
 
 export async function suspend({ vm }) {
-  await this.getXapi(vm).call('VM.suspend', vm._xapiRef)
+  await this.getXapi(vm).callAsync('VM.suspend', vm._xapiRef)
 }
 
 suspend.params = {
@@ -1103,7 +1102,7 @@ suspend.resolve = {
 // -------------------------------------------------------------------
 
 export async function pause({ vm }) {
-  await this.getXapi(vm).call('VM.pause', vm._xapiRef)
+  await this.getXapi(vm).callAsync('VM.pause', vm._xapiRef)
 }
 
 pause.params = {
@@ -1366,9 +1365,7 @@ createInterface.resolve = {
 // -------------------------------------------------------------------
 
 export async function attachPci({ vm, pciId }) {
-  const xapi = this.getXapi(vm)
-
-  await xapi.call('VM.add_to_other_config', vm._xapiRef, 'pci', pciId)
+  await this.getXapiObject(vm).update_other_config('pci', pciId)
 }
 
 attachPci.params = {
@@ -1383,9 +1380,7 @@ attachPci.resolve = {
 // -------------------------------------------------------------------
 
 export async function detachPci({ vm }) {
-  const xapi = this.getXapi(vm)
-
-  await xapi.call('VM.remove_from_other_config', vm._xapiRef, 'pci')
+  await this.getXapiObject(vm).update_other_config('pci', null)
 }
 
 detachPci.params = {
@@ -1418,15 +1413,11 @@ stats.resolve = {
 // -------------------------------------------------------------------
 
 export async function setBootOrder({ vm, order }) {
-  const xapi = this.getXapi(vm)
-
-  order = { order }
-  if (vm.virtualizationMode === 'hvm') {
-    await xapi.call('VM.set_HVM_boot_params', vm._xapiRef, order)
-    return
+  if (vm.virtualizationMode !== 'hvm') {
+    throw invalidParameters('You can only set the boot order on a HVM guest')
   }
 
-  throw invalidParameters('You can only set the boot order on a HVM guest')
+  await this.getXapiObject(vm).update_HVM_boot_params('order', order)
 }
 
 setBootOrder.params = {
