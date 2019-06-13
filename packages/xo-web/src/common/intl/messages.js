@@ -1713,6 +1713,7 @@ const messages = {
   networkInUse: 'This network is currently in use',
   pillBonded: 'Bonded',
   bondedNetwork: 'Bonded network',
+  privateNetwork: 'Private network',
 
   // ----- Add host -----
   addHostSelectHost: 'Host',
