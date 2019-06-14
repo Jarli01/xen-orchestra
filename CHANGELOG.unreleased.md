@@ -2,7 +2,7 @@
 
 ### Enhancements
 
-- SDN Controller plugin: allow pool-wide private networks creation.
+- [SDN Controller plugin] allow pool-wide private networks creation (PR [#4269](https://github.com/vatesfr/xen-orchestra/pull/4269))
 
 ### Bug fixes
 
