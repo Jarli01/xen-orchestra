@@ -777,6 +777,9 @@ export const emergencyShutdownHosts = hosts => {
   }).then(() => map(hosts, host => emergencyShutdownHost(host)), noop)
 }
 
+export const getHyperthreadingHost = host =>
+  _call('host.getHyperthreading', { hostId: resolveId(host) })
+
 // for XCP-ng now
 export const installAllPatchesOnHost = ({ host }) =>
   confirm({
